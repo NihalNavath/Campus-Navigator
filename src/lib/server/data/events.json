@@ -1,0 +1,82 @@
+[
+  {
+    "id": "evt_001",
+    "title": "Nexus Event",
+    "description": "Annual tech fest showcasing innovation",
+    "location": {
+      "name": "Basketball 1",
+      "coordinates": [
+        77.43716007569962,
+        12.86190057440364
+      ]
+    },
+    "date": "2025-12-15",
+    "time": "10:00 AM",
+    "createdAt": "2025-11-22T16:00:00.000Z",
+    "updatedAt": "2025-11-22T16:00:00.000Z"
+  },
+  {
+    "id": "evt_002",
+    "title": "Christmas Carol",
+    "description": "Christmas celebration at the chapel",
+    "location": {
+      "name": "Chapel",
+      "coordinates": [
+        77.4375183520711,
+        12.86039677223134
+      ]
+    },
+    "date": "2025-12-24",
+    "time": "6:00 PM",
+    "createdAt": "2025-11-22T16:00:00.000Z",
+    "updatedAt": "2025-11-22T16:00:00.000Z"
+  },
+  {
+    "id": "evt_1763830559828",
+    "title": "Test Event",
+    "description": "Block III - Audi Ground Floor",
+    "date": "2025-11-19",
+    "time": "00:25",
+    "location": {
+      "name": "Basketball 2",
+      "coordinates": [
+        77.43695467133065,
+        12.86180364615626
+      ]
+    },
+    "createdAt": "2025-11-22T16:55:59.828Z",
+    "updatedAt": "2025-11-22T16:55:59.828Z"
+  },
+  {
+    "id": "evt_1763830605878",
+    "title": "Food Area",
+    "description": "Foodie Foodie Good 🍕",
+    "date": "2025-11-23",
+    "time": "01:26",
+    "location": {
+      "name": "North Canteen",
+      "coordinates": [
+        77.43887844453603,
+        12.85943205775281
+      ]
+    },
+    "createdAt": "2025-11-22T16:56:45.878Z",
+    "updatedAt": "2025-11-22T16:56:45.878Z"
+  },
+  {
+    "id": "evt_1763971951153",
+    "title": "Test Event",
+    "description": "",
+    "date": "2025-11-25",
+    "time": "16:42",
+    "location": {
+      "name": "North Canteen",
+      "coordinates": [
+        77.43887844453603,
+        12.85943205775281
+      ]
+    },
+    "createdAt": "2025-11-24T08:12:31.153Z",
+    "updatedAt": "2025-11-24T08:12:31.153Z"
+  }
+]
