@@ -138,14 +138,15 @@
 	}
 
 	.sidebar.collapsed {
-		min-width: 48px;
-		max-width: 48px;
+		min-width: 60px; /* Wider strip */
+		max-width: 60px;
+		overflow: visible; /* CRITICAL: Never clip the button */
 	}
 
 	.toggle-btn {
 		position: absolute;
 		top: 12px;
-		left: 12px;
+		left: 14px; /* Fixed comfortably */
 		width: 32px;
 		height: 32px;
 		border: none;
@@ -159,11 +160,11 @@
 		justify-content: center;
 		transition: all 0.2s;
 		box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-		z-index: 10;
+		z-index: 100; /* Ensure strictly above everything */
 	}
 
 	.toggle-btn:hover {
-		transform: scale(1.05);
+		transform: scale(1.05); /* Original hover effect */
 		box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 	}
 
@@ -301,8 +302,8 @@
 		}
 
 		.sidebar.collapsed {
-			min-width: 44px;
-			max-width: 44px;
+			min-width: 60px;
+			max-width: 60px;
 		}
 	}
 </style>
