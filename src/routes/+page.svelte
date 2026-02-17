@@ -11,6 +11,12 @@
 	let selectedBlockName = '';
 	let currentSubVenues = [];
 
+	// Navigation state
+	let isNavigating = false;
+	let isManualLocation = false;
+	let currentDestinationName = '';
+	let arrivalInfo = null;
+
 	// Whitelist of blocks allowed to show the popup
 	const allowedBlocks = [
 		'Block 1',
@@ -42,8 +48,33 @@
 	function handleNavigation(coords, locationName) {
 		if (mapComponent && coords) {
 			console.log('Navigating to:', locationName, coords);
-			mapComponent.navigateTo(coords);
+			currentDestinationName = locationName;
+			mapComponent.navigateTo(coords, locationName);
 		}
+	}
+
+	function handleNavigationStart(event) {
+		isNavigating = true;
+		if (event.detail && event.detail.name) {
+			currentDestinationName = event.detail.name;
+		}
+	}
+
+	function handleNavigationEnd() {
+		isNavigating = false;
+		currentDestinationName = '';
+	}
+
+	function handleArrival(e) {
+		arrivalInfo = { name: e.detail.destinationName };
+	}
+
+	function handleStopNavigation() {
+		if (mapComponent) mapComponent.stopNavigation();
+	}
+
+	function handleRecenter() {
+		if (mapComponent) mapComponent.handleRecenter();
 	}
 
 	function handleBlockSelection(event) {
@@ -72,8 +103,22 @@
 </svelte:head>
 
 <div class="app-container">
-	<Map bind:this={mapComponent} on:selectBuilding={handleBlockSelection} />
-	<EventsSidebar onNavigate={handleNavigation} />
+	<Map
+		bind:this={mapComponent}
+		bind:isNavigating
+		bind:isManualLocation
+		on:selectBuilding={handleBlockSelection}
+		on:navigationStart={handleNavigationStart}
+		on:navigationEnd={handleNavigationEnd}
+		on:arrival={handleArrival}
+	/>
+	<EventsSidebar
+		onNavigate={handleNavigation}
+		{isNavigating}
+		destinationName={currentDestinationName}
+		bind:arrivalInfo
+		onStopNavigation={handleStopNavigation}
+	/>
 	<SubVenuePopup
 		visible={showSubVenuePopup}
 		blockName={selectedBlockName}

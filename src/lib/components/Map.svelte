@@ -10,8 +10,7 @@
 		DEFAULT_PITCH: 30, // Comfortable viewing angle
 		TERRAIN_EXAGGERATION: 1.0, // Realistic terrain
 		ANIMATION_DURATION: 2000,
-		ACCESS_TOKEN:
-			'pk.eyJ1IjoiYW50cmlhbSIsImEiOiJjbWh2d2NiaGowMG9rMmtyN3Bkc3JnaThwIn0.iFHfpZ6plljq9I_HTwD_pQ'
+		ACCESS_TOKEN: import.meta.env.VITE_MAPBOX_TOKEN
 	};
 
 	let map;
@@ -19,28 +18,45 @@
 	let userMarker = null;
 	let destinationMarker = null; // Dynamic Destination Marker
 	let watchId = null;
-	let isNavigating = false; // Track if auto-tracking is active
-	let showRecenterBtn = false; // UI State
-	let isManualLocation = false; // Manual override flag
+	export let isNavigating = false; // Track if auto-tracking is active
+	export let showRecenterBtn = false; // UI State
+	export let isManualLocation = false; // Manual override flag
+
+	let navInterval;
+	let currentDestination = null;
 
 	/* ---------------------------------------------------------
      EXPORTED METHOD
   --------------------------------------------------------- */
-	export function navigateTo(targetCoords) {
-		startNavigation(); // Enable tracking state
+	export function navigateTo(targetCoords, locationName = 'Destination') {
+		if (!map || !mapboxgl) return;
+		startNavigation(locationName); // Pass name to state
 
 		// Add Dynamic Destination Marker
 		if (destinationMarker) destinationMarker.remove();
 		destinationMarker = new mapboxgl.Marker({ color: '#ff4444' })
 			.setLngLat(targetCoords)
-			.setPopup(new mapboxgl.Popup().setHTML(`<b>Destination</b>`))
+			.setPopup(new mapboxgl.Popup().setHTML(`<b>${locationName}</b>`))
 			.addTo(map);
 		destinationMarker.togglePopup(); // Show it immediately
 
-		// If we know where the user is, immediately calculate route
+		// If we know where the user is, immediately calculate route and focus on user
 		if (userMarker) {
-			const userCoords = [userMarker.getLngLat().lng, userMarker.getLngLat().lat];
-			getRoute(userCoords, targetCoords);
+			currentDestination = targetCoords;
+			const userPos = userMarker.getLngLat();
+			const userCoords = [userPos.lng, userPos.lat];
+
+			// Initial focus: Go directly to user location at high zoom
+			map.flyTo({
+				center: userCoords,
+				zoom: 19,
+				pitch: CONFIG.DEFAULT_PITCH,
+				bearing: 0,
+				speed: 1.5,
+				curve: 1
+			});
+
+			getRoute(userCoords, targetCoords, false); // Fetch route but don't force overview
 		} else {
 			// Fallback: wait for GPS
 			if (!navigator.geolocation) {
@@ -50,7 +66,8 @@
 			navigator.geolocation.getCurrentPosition(
 				(pos) => {
 					const userCoords = [pos.coords.longitude, pos.coords.latitude];
-					getRoute(userCoords, targetCoords);
+					map.flyTo({ center: userCoords, zoom: 19 });
+					getRoute(userCoords, targetCoords, false);
 				},
 				() => alert('Enable GPS to get directions'),
 				{ enableHighAccuracy: true }
@@ -70,6 +87,7 @@
 
 	onDestroy(() => {
 		if (watchId) navigator.geolocation.clearWatch(watchId);
+		if (navInterval) clearInterval(navInterval);
 		if (map) map.remove();
 	});
 
@@ -78,7 +96,17 @@
   --------------------------------------------------------- */
 	function initMap() {
 		mapboxgl = window.mapboxgl;
-		mapboxgl.accessToken = CONFIG.ACCESS_TOKEN;
+		const token = CONFIG.ACCESS_TOKEN;
+
+		if (!token || token === 'undefined') {
+			console.error('Mapbox Access Token is missing or undefined.');
+			alert(
+				'Mapbox Token Missing! 🛑\n\nPlease ensure you have a .env file with VITE_MAPBOX_TOKEN correctly set and restart your terminal.'
+			);
+			return;
+		}
+
+		mapboxgl.accessToken = token;
 
 		map = new mapboxgl.Map({
 			container: 'map',
@@ -123,35 +151,88 @@
 	}
 
 	function handleUserInteraction(e) {
-		// Only stop interaction if it originated from the user (touch/mouse)
-		if (e && e.originalEvent && isNavigating) {
-			stopNavigation();
+		// Only show recenter button if the interaction originated from the user (touch/mouse)
+		if (e && e.originalEvent && !isManualLocation) {
+			isManualLocation = true;
+			showRecenterBtn = true;
 		}
 	}
 
-	function startNavigation() {
+	export function startNavigation(locationName = 'Destination') {
+		if (!map) return;
 		isNavigating = true;
 		showRecenterBtn = false;
+
+		// Dispatch event to parent
+		dispatch('navigationStart', { name: locationName });
+
+		// Close any open popups to reduce clutter
+		const popups = document.getElementsByClassName('mapboxgl-popup');
+		if (popups.length) {
+			for (let i = 0; i < popups.length; i++) {
+				popups[i].remove();
+			}
+		}
+
+		// Clear existing interval if any
+		if (navInterval) clearInterval(navInterval);
+
+		// Start dynamic route updates (don't move camera focus)
+		// Reduced frequency (10s) to save battery/resources
+		navInterval = setInterval(() => {
+			if (isNavigating && userMarker && currentDestination) {
+				const userPos = userMarker.getLngLat().toArray();
+				getRoute(userPos, currentDestination, false);
+			}
+		}, 10000); // 10 seconds is plenty for walking speed
 	}
 
-	function stopNavigation() {
+	export function stopNavigation() {
 		isNavigating = false;
 		showRecenterBtn = true;
+
+		// Dispatch event to parent
+		dispatch('navigationEnd');
+
+		if (navInterval) {
+			clearInterval(navInterval);
+			navInterval = null;
+		}
+
+		// Clear Destination Marker
+		if (destinationMarker) {
+			destinationMarker.remove();
+			destinationMarker = null;
+		}
+
+		// Clear the route line
+		if (map && map.getSource('route')) {
+			map.getSource('route').setData({
+				type: 'Feature',
+				properties: {},
+				geometry: {
+					type: 'LineString',
+					coordinates: []
+				}
+			});
+		}
 	}
 
-	function handleRecenter() {
+	export function handleRecenter() {
 		isManualLocation = false; // Resume GPS
+		showRecenterBtn = false;
+
 		if (userMarker) {
 			const pos = userMarker.getLngLat();
+			const currentZoom = map.getZoom();
 			map.flyTo({
 				center: pos,
-				zoom: 19,
+				zoom: Math.max(currentZoom, 19), // Don't zoom out if already closer
 				pitch: CONFIG.DEFAULT_PITCH,
 				bearing: 0,
-				speed: 1.2, // Make it look like a smooth flight
+				speed: 1.2,
 				curve: 1.42
 			});
-			startNavigation();
 		} else {
 			alert('Waiting for GPS location...');
 		}
@@ -215,9 +296,14 @@
 					const source = map.getSource('user-accuracy');
 					if (source) source.setData({ type: 'FeatureCollection', features: [] });
 				} else if (accuracy) {
-					const circleGeo = createGeoJSONCircle([lng, lat], accuracy / 1000);
+					const circleFeature = createGeoJSONCircle([lng, lat], accuracy / 1000);
 					const source = map.getSource('user-accuracy');
-					if (source) source.setData(circleGeo);
+					if (source) {
+						source.setData({
+							type: 'FeatureCollection',
+							features: [circleFeature]
+						});
+					}
 				}
 
 				// Follow User if Navigating
@@ -228,11 +314,40 @@
 						duration: 1000,
 						easing: (t) => t
 					});
+
+					// Arrival Detection
+					if (currentDestination) {
+						const dist = getDistance(userPos, currentDestination);
+
+						if (dist < 15) {
+							// 15 meters
+							dispatch('arrival', { destinationName });
+							stopNavigation();
+						}
+					}
 				}
 			},
-			(err) => console.error('GPS Error:', err),
-			{ enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+			(err) => {
+				console.error('GPS Error:', err);
+				if (err.code === 1) alert('Please enable Location permissions to use navigation.');
+			},
+			{ enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
 		);
+	}
+
+	// Haversine formula to calculate distance in meters
+	function getDistance(coord1, coord2) {
+		const R = 6371000; // Radius of Earth in meters
+		const dLat = ((coord2[1] - coord1[1]) * Math.PI) / 180;
+		const dLon = ((coord2[0] - coord1[0]) * Math.PI) / 180;
+		const a =
+			Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+			Math.cos((coord1[1] * Math.PI) / 180) *
+				Math.cos((coord2[1] * Math.PI) / 180) *
+				Math.sin(dLon / 2) *
+				Math.sin(dLon / 2);
+		const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+		return R * c;
 	}
 
 	// Helper: Create a circular polygon around a point
@@ -265,9 +380,10 @@
      LOADERS & LAYERS
   --------------------------------------------------------- */
 	function loadCampusLayers() {
+		const now = new Date().getTime();
 		map.addSource('campus', {
 			type: 'geojson',
-			data: '/map_main.geojson'
+			data: `/map_main.geojson?t=${now}`
 		});
 
 		// 1. Polygons Fill
@@ -305,7 +421,7 @@
 				'line-cap': 'round'
 			},
 			paint: {
-				'line-color': '#ffcc00', // Bright Yellow
+				'line-color': '#D3D3D3',
 				'line-width': 4,
 				'line-opacity': 0.9
 			}
@@ -334,11 +450,35 @@
 			const name = feature.properties.name;
 			if (!name) return;
 
-			// Center calculation (naive)
-			const coordinates = feature.geometry.coordinates[0];
-			const center = coordinates[0]; // Simplified center for demo
+			// Use destination property if available, otherwise use polygon center
+			let targetCoords;
+			const dest = feature.properties.destination;
 
-			dispatch('selectBuilding', { name, properties: feature.properties, coordinates: center });
+			if (dest) {
+				try {
+					const parsedDest = typeof dest === 'string' ? JSON.parse(dest) : dest;
+					if (Array.isArray(parsedDest) && parsedDest.length >= 2) {
+						targetCoords = [Number(parsedDest[0]), Number(parsedDest[1])];
+						console.log(`✓ Map click ${name}: Using precise destination`, targetCoords);
+					}
+				} catch (err) {
+					console.warn('Error parsing destination:', err);
+				}
+			}
+
+			if (!targetCoords) {
+				// Fallback: use first coordinate of polygon (remove elevation if present)
+				const coordinates = feature.geometry.coordinates[0];
+				const firstCoord = coordinates[0];
+				targetCoords = Array.isArray(firstCoord) ? firstCoord.slice(0, 2) : firstCoord;
+				console.log(`⚠ Map click ${name}: Using fallback coords`, targetCoords);
+			}
+
+			dispatch('selectBuilding', {
+				name,
+				properties: feature.properties,
+				coordinates: targetCoords
+			});
 
 			new mapboxgl.Popup({ offset: 25 })
 				.setLngLat(e.lngLat)
@@ -347,7 +487,7 @@
 
 			setTimeout(() => {
 				const btn = document.getElementById('btn-go');
-				if (btn) btn.onclick = () => navigateTo(center);
+				if (btn) btn.onclick = () => navigateTo(targetCoords, name);
 			}, 50);
 		});
 	}
@@ -375,7 +515,8 @@
 	/* ---------------------------------------------------------
      ROUTING
   --------------------------------------------------------- */
-	async function getRoute(start, end) {
+	async function getRoute(start, end, fitToRoute = false) {
+		if (!map || !map.getStyle()) return;
 		try {
 			const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&access_token=${mapboxgl.accessToken}`;
 			const res = await fetch(url);
@@ -386,8 +527,27 @@
 				return;
 			}
 
-			const route = data.routes[0].geometry.coordinates;
-			const geojson = { type: 'Feature', geometry: { type: 'LineString', coordinates: route } };
+			const rawCoords = data.routes[0].geometry.coordinates;
+
+			// Extend the route to the exact destination point
+			if (end && Array.isArray(end) && end.length >= 2) {
+				const lastPoint = rawCoords[rawCoords.length - 1];
+				const isDifferent =
+					Math.abs(lastPoint[0] - end[0]) > 0.000001 || Math.abs(lastPoint[1] - end[1]) > 0.000001;
+
+				if (isDifferent) {
+					rawCoords.push(end);
+				}
+			}
+
+			const geojson = {
+				type: 'Feature',
+				properties: {},
+				geometry: {
+					type: 'LineString',
+					coordinates: rawCoords
+				}
+			};
 
 			if (map.getSource('route')) {
 				map.getSource('route').setData(geojson);
@@ -408,10 +568,17 @@
 				});
 			}
 
-			// Fit bounds to show route
-			const bounds = new mapboxgl.LngLatBounds();
-			route.forEach((p) => bounds.extend(p));
-			map.fitBounds(bounds, { padding: 100, duration: 1500 });
+			// Fit bounds to show route only if requested (e.g., at start of navigation)
+			if (fitToRoute) {
+				const bounds = new mapboxgl.LngLatBounds();
+				geojson.geometry.coordinates.forEach((p) => bounds.extend(p));
+				// Use more conservative padding and a maxZoom to avoid "big view" zoom outs
+				map.fitBounds(bounds, {
+					padding: { top: 60, bottom: 120, left: 60, right: 60 }, // More space at bottom for UI
+					duration: 1500,
+					maxZoom: 19 // Prevent zooming out too far for short routes
+				});
+			}
 		} catch (err) {
 			console.error(err);
 		}
@@ -422,7 +589,9 @@
 
 <!-- Custom UI Elements -->
 {#if showRecenterBtn}
-	<button class="recenter-btn" on:click={handleRecenter}> Recenter </button>
+	<button class="recenter-btn" on:click={handleRecenter} aria-label="Recenter Map">
+		<span class="icon">🎯</span>
+	</button>
 {/if}
 
 <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.0.0/mapbox-gl.css" />
@@ -433,35 +602,50 @@
 		height: 100vh;
 	}
 
-	/* Floating Recenter Button */
+	/* Floating Recenter Button (G-Maps Style) */
 	.recenter-btn {
 		position: absolute;
-		bottom: 30px;
-		left: 50%;
-		transform: translateX(-50%);
-		background: #ffffff;
-		color: #333;
-		border: none;
-		padding: 12px 24px;
-		border-radius: 30px;
+		bottom: 120px; /* Elevated to sit above bottom sheet/nav bar */
+		right: 20px;
+		width: 52px;
+		height: 52px;
+		background: rgba(255, 255, 255, 0.9);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		color: var(--primary, #6366f1);
+		border: 1px solid rgba(0, 0, 0, 0.08);
+		border-radius: 50%;
 		font-weight: 600;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 		cursor: pointer;
-		z-index: 10;
-		transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+		z-index: 999;
+		transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		justify-content: center;
+		padding: 0;
+	}
+
+	.recenter-btn .icon {
+		font-size: 24px;
 	}
 
 	.recenter-btn:hover {
-		transform: translateX(-50%) scale(1.05);
-		box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
-		background: #f8f9fa;
+		transform: scale(1.1);
+		background: #ffffff;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
 	}
 
 	.recenter-btn:active {
-		transform: translateX(-50%) scale(0.95);
+		transform: scale(0.9);
+	}
+
+	/* Desktop adjustment for recenter */
+	@media (min-width: 769px) {
+		.recenter-btn {
+			bottom: 30px;
+			right: 420px; /* Positioned relative to the wider sidebar */
+		}
 	}
 
 	/* Custom Marker Styling */
