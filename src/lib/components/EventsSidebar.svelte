@@ -88,6 +88,10 @@
 </script>
 
 <div class="sidebar-container" class:navigating={isNavigating} class:minimized={isMinimized}>
+	<button class="toggle-btn" on:click={toggleMinimize}>
+		<span class="icon"></span>
+		<span class="text">Campus Events</span>
+	</button>
 	{#if isNavigating}
 		<!-- Unified Navigation Bar (Restored & Improved) -->
 		<div class="nav-bar-unified">
@@ -118,11 +122,6 @@
 	{#if !isNavigating}
 		<!-- Modern Event List & Blocks -->
 		<div class="sheet-handle" on:click={toggleMinimize}></div>
-
-		<button class="expand-pill" on:click={toggleMinimize}>
-			<span class="icon">🏢</span>
-			<span class="text">Campus Hub</span>
-		</button>
 
 		<div class="content-wrapper">
 			<header class="sidebar-header">
@@ -228,6 +227,7 @@
 		display: flex;
 		flex-direction: column;
 		overflow: hidden;
+		will-change: transform;
 	}
 
 	/* Sidebar Container States */
@@ -240,27 +240,32 @@
 		cursor: pointer;
 	}
 
-	.sidebar-container.minimized .content-wrapper {
-		display: none;
-	}
-
-	.sidebar-container.minimized .expand-pill {
+	.sidebar-container.minimized .toggle-btn {
 		display: flex;
 	}
 
-	.expand-pill {
+	.toggle-btn {
 		display: none;
 		align-items: center;
 		justify-content: center;
-		gap: 8px;
+		gap: 10px;
 		width: 100%;
 		height: 100%;
-		border: none;
-		background: transparent;
+		border: 1px solid var(--border-glass);
+		background: white;
 		color: var(--text-main);
 		font-weight: 700;
 		font-size: 14px;
 		cursor: pointer;
+		padding: 0 16px;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+	}
+
+	/* Mobile Toggle Button (Overridden below) */
+
+	.toggle-btn:active {
+		transform: scale(0.96);
+		filter: brightness(1.1);
 	}
 
 	/* Navigation Mode */
@@ -697,17 +702,41 @@
 			height: 70vh;
 			border-radius: 32px 32px 0 0;
 			transform: translateY(0);
+			transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 		}
 
 		.sidebar-container.minimized {
-			transform: translateY(calc(70vh - 40px)); /* Lower than before, just the handle visible */
 			width: 100%;
-			height: 70vh;
-			border-radius: 32px 32px 0 0;
+			height: 88px;
+			background: transparent;
+			border: none;
+			box-shadow: none;
+			backdrop-filter: none;
+			transform: none;
+			display: flex;
+			flex-direction: column;
+			justify-content: flex-end;
+			padding-bottom: 16px;
 		}
 
-		.sidebar-container.minimized .expand-pill {
-			display: none; /* Keep handle for mobile */
+		.sidebar-container.minimized .toggle-btn {
+			display: flex;
+			width: auto;
+			min-width: 200px;
+			height: 52px;
+			margin: 0 auto;
+			background: white;
+			color: var(--text-main);
+			font-size: 15px;
+			border-radius: 100px;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+			border: 1px solid rgba(0, 0, 0, 0.05);
+			justify-content: center;
+			align-items: center;
+		}
+
+		.sidebar-container.minimized .sheet-handle {
+			display: none;
 		}
 
 		.sidebar-container.minimized .content-wrapper {
