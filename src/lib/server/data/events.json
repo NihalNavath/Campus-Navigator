@@ -1,19 +1,19 @@
 [
   {
     "id": "evt_001",
-    "title": "Nexus Event",
+    "title": "Texus",
     "description": "Annual tech fest showcasing innovation",
     "location": {
-      "name": "Basketball 1",
+      "name": "Block 4",
       "coordinates": [
-        77.43716007569962,
-        12.86190057440364
+        77.43917124814757,
+        12.86282069368337
       ]
     },
     "date": "2025-12-15",
     "time": "10:00 AM",
     "createdAt": "2025-11-22T16:00:00.000Z",
-    "updatedAt": "2025-11-22T16:00:00.000Z"
+    "updatedAt": "2026-02-16T15:43:31.324Z"
   },
   {
     "id": "evt_002",
