@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 // Simple admin credentials (in production, use environment variables and hashed passwords)
 const ADMIN_USERNAME = 'admin';
-const ADMIN_PASSWORD = 'christ@admin123'; // Change this in production!
+const ADMIN_PASSWORD = 'adminProd1313$$'; // Change this in production!
 
 // Session storage (in production, use a proper session store like Redis)
 const sessions = new Map();
